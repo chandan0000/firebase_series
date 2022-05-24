@@ -1,5 +1,6 @@
 import 'package:fire_s/screens/EMAIL_AUTH/login_screen.dart';
 import 'package:fire_s/screens/home_screen.dart';
+import 'package:fire_s/screens/phone_Auth/sign_in_with.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:flutter/material.dart';
@@ -23,8 +24,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: (FirebaseAuth.instance.currentUser != null)
           ? HomeScreen()
-          : LoginScreen(),
-      // home:  LoginScreen(),
+          : SignInWithPhone(),
+      // home: SignInWithPhone(),
     );
   }
 }
