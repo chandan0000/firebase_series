@@ -1,12 +1,15 @@
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:firebaseseries/screens/email_auth/login_screen.dart';
+import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
+import 'package:uuid/uuid.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fire_s/screens/phone_Auth/sign_in_with.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'EMAIL_AUTH/login_screen.dart';
 
@@ -21,7 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   TextEditingController nameController = TextEditingController();
   TextEditingController ageController = TextEditingController();
   TextEditingController emailController = TextEditingController();
-  void saveUser() {
+  File? profilePic;
+  void saveUser() async {
     String name = nameController.text.trim();
     String email = emailController.text.trim();
     String ageString = ageController.text.trim();
@@ -29,17 +33,36 @@ class _HomeScreenState extends State<HomeScreen> {
     nameController.clear();
     emailController.clear();
     ageController.clear();
-    if (name != "" && email != "") {
+    if (name != "" && email != "" && profilePic != null) {
+      UploadTask uploadTask = FirebaseStorage.instance
+          .ref()
+          .child("profilepictures")
+          .child(Uuid().v1())
+          .putFile(profilePic!);
+
+      StreamSubscription taskSub = uploadTask.snapshotEvents.listen((snapshot) {
+        double percentage =
+            snapshot.bytesTransferred / snapshot.totalBytes * 100;
+        log(percentage.toString());
+      });
+      TaskSnapshot taskSnapshot = await uploadTask;
+      String downloadurl = await taskSnapshot.ref.getDownloadURL();
+      taskSub.cancel();
       Map<String, dynamic> usersData = {
         "name": name,
         'email': email,
-        'age': age
+        'age': age,
+        "prfilepic": downloadurl,
+        'sampleArray': [name, email, age],
       };
       FirebaseFirestore.instance.collection("users").add(usersData);
       log("user created");
     } else {
       log("please fill  all the Fields ");
     }
+    setState(() {
+      profilePic = null;
+    });
   }
 
   void logOut() async {
@@ -68,6 +91,28 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(15),
           child: Column(
             children: [
+              CupertinoButton(
+                onPressed: () async {
+                  XFile? selelctedImage = await ImagePicker()
+                      .pickImage(source: ImageSource.gallery);
+
+                  if (selelctedImage != null) {
+                    File convertedFile = File(selelctedImage.path);
+                    setState(() {
+                      profilePic = convertedFile;
+                    });
+                    log("Image Selected");
+                  } else {
+                    log("Image not Selected");
+                  }
+                },
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.grey,
+                  backgroundImage:
+                      (profilePic != null) ? FileImage(profilePic!) : null,
+                ),
+              ),
               TextField(
                 controller: nameController,
                 decoration: InputDecoration(hintText: "Name"),
@@ -114,6 +159,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 snapshot.data!.docs[index].data()
                                     as Map<String, dynamic>;
                             return ListTile(
+                              leading: CircleAvatar(
+                                  backgroundImage:
+                                      NetworkImage(userMap["profilepic"])),
                               title:
                                   Text(userMap["name"] + "(${userMap['age']})"),
                               subtitle: Text(userMap['email']),

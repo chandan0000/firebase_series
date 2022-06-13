@@ -31,8 +31,12 @@ dependencies:
   cupertino_icons: ^1.0.2
   firebase_auth: null
   firebase_core: null
+  firebase_messaging: ^11.4.1
+  firebase_storage: ^10.2.17
   flutter:
     sdk: flutter
+  image_picker: ^0.8.5+3
+  uuid: ^3.0.6
 
 dev_dependencies:
 
