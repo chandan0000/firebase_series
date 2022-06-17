@@ -16,7 +16,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  await NotificationS.initialize();
+  await NotificationService.initialize();
   // FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // DocumentSnapshot snapshot = await FirebaseFirestore.instance

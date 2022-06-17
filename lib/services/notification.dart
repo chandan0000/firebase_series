@@ -6,17 +6,19 @@ Future<void> backgroundHandler(RemoteMessage message) async {
   log("message received! ${message.notification!.title}");
 }
 
-class NotificationS {
+class NotificationService {
   static Future<void> initialize() async {
-    NotificationSettings setting =
+    NotificationSettings settings =
         await FirebaseMessaging.instance.requestPermission();
-    if (setting.authorizationStatus == AuthorizationStatus.authorized) {
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        log(token);
+      }
+
       FirebaseMessaging.onBackgroundMessage(backgroundHandler);
 
-      FirebaseMessaging.onMessage.listen((message) {
-        log("Message received ${message.notification!.title}");
-      });
-      log("Notification initlize");
+      log("Notifications Initialized!");
     }
   }
 }

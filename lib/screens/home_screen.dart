@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
-import 'package:uuid/uuid.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fire_s/screens/EMAIL_AUTH/sinup_screen.dart';
 import 'package:fire_s/screens/phone_Auth/sign_in_with.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
-import 'EMAIL_AUTH/login_screen.dart';
+import 'package:uuid/uuid.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -22,54 +22,107 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   TextEditingController nameController = TextEditingController();
-  TextEditingController ageController = TextEditingController();
   TextEditingController emailController = TextEditingController();
-  File? profilePic;
-  void saveUser() async {
-    String name = nameController.text.trim();
-    String email = emailController.text.trim();
-    String ageString = ageController.text.trim();
-    int age = int.parse(ageString);
-    nameController.clear();
-    emailController.clear();
-    ageController.clear();
-    if (name != "" && email != "" && profilePic != null) {
-      UploadTask uploadTask = FirebaseStorage.instance
-          .ref()
-          .child("profilepictures")
-          .child(Uuid().v1())
-          .putFile(profilePic!);
-
-      StreamSubscription taskSub = uploadTask.snapshotEvents.listen((snapshot) {
-        double percentage =
-            snapshot.bytesTransferred / snapshot.totalBytes * 100;
-        log(percentage.toString());
-      });
-      TaskSnapshot taskSnapshot = await uploadTask;
-      String downloadurl = await taskSnapshot.ref.getDownloadURL();
-      taskSub.cancel();
-      Map<String, dynamic> usersData = {
-        "name": name,
-        'email': email,
-        'age': age,
-        "prfilepic": downloadurl,
-        'sampleArray': [name, email, age],
-      };
-      FirebaseFirestore.instance.collection("users").add(usersData);
-      log("user created");
-    } else {
-      log("please fill  all the Fields ");
-    }
-    setState(() {
-      profilePic = null;
-    });
-  }
+  TextEditingController ageController = TextEditingController();
+  File? profilepic;
 
   void logOut() async {
     await FirebaseAuth.instance.signOut();
     Navigator.popUntil(context, (route) => route.isFirst);
     Navigator.pushReplacement(
         context, CupertinoPageRoute(builder: (context) => SignInWithPhone()));
+  }
+
+  void saveUser() async {
+    String name = nameController.text.trim();
+    String email = emailController.text.trim();
+    String ageString = ageController.text.trim();
+
+    int age = int.parse(ageString);
+
+    nameController.clear();
+    emailController.clear();
+    ageController.clear();
+
+    if (name != "" && email != "" && profilepic != null) {
+      UploadTask uploadTask = FirebaseStorage.instance
+          .ref()
+          .child("profilepictures")
+          .child(Uuid().v1())
+          .putFile(profilepic!);
+
+      StreamSubscription taskSubscription =
+          uploadTask.snapshotEvents.listen((snapshot) {
+        double percentage =
+            snapshot.bytesTransferred / snapshot.totalBytes * 100;
+        log(percentage.toString());
+      });
+
+      TaskSnapshot taskSnapshot = await uploadTask;
+      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      taskSubscription.cancel();
+
+      Map<String, dynamic> userData = {
+        "name": name,
+        "email": email,
+        "age": age,
+        "profilepic": downloadUrl,
+        "samplearray": [name, email, age]
+      };
+      FirebaseFirestore.instance.collection("users").add(userData);
+      log("User created!");
+    } else {
+      log("Please fill all the fields!");
+    }
+
+    setState(() {
+      profilepic = null;
+    });
+  }
+
+  void getInitialMessage() async {
+    RemoteMessage? message =
+        await FirebaseMessaging.instance.getInitialMessage();
+
+    if (message != null) {
+      if (message.data["page"] == "email") {
+        Navigator.push(
+            context, CupertinoPageRoute(builder: (context) => SignUpScreen()));
+      } else if (message.data["page"] == "phone") {
+        Navigator.push(context,
+            CupertinoPageRoute(builder: (context) => SignInWithPhone()));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Invalid Page!"),
+          duration: Duration(seconds: 5),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    getInitialMessage();
+
+    FirebaseMessaging.onMessage.listen((message) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message.data["myname"].toString()),
+        duration: Duration(seconds: 10),
+        backgroundColor: Colors.green,
+      ));
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("App was opened by a notification"),
+        duration: Duration(seconds: 10),
+        backgroundColor: Colors.green,
+      ));
+    });
   }
 
   @override
@@ -93,24 +146,25 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               CupertinoButton(
                 onPressed: () async {
-                  XFile? selelctedImage = await ImagePicker()
+                  XFile? selectedImage = await ImagePicker()
                       .pickImage(source: ImageSource.gallery);
 
-                  if (selelctedImage != null) {
-                    File convertedFile = File(selelctedImage.path);
+                  if (selectedImage != null) {
+                    File convertedFile = File(selectedImage.path);
                     setState(() {
-                      profilePic = convertedFile;
+                      profilepic = convertedFile;
                     });
-                    log("Image Selected");
+                    log("Image selected!");
                   } else {
-                    log("Image not Selected");
+                    log("No image selected!");
                   }
                 },
+                padding: EdgeInsets.zero,
                 child: CircleAvatar(
                   radius: 40,
-                  backgroundColor: Colors.grey,
                   backgroundImage:
-                      (profilePic != null) ? FileImage(profilePic!) : null,
+                      (profilepic != null) ? FileImage(profilepic!) : null,
+                  backgroundColor: Colors.grey,
                 ),
               ),
               TextField(
@@ -143,49 +197,51 @@ class _HomeScreenState extends State<HomeScreen> {
               SizedBox(
                 height: 20,
               ),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection("users")
-                      .orderBy("age")
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.active) {
-                      if (snapshot.hasData && snapshot.data != null) {
-                        return ListView.builder(
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection("users")
+                    .where("age", isGreaterThanOrEqualTo: 19)
+                    .orderBy("age", descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.active) {
+                    if (snapshot.hasData && snapshot.data != null) {
+                      return Expanded(
+                        child: ListView.builder(
                           itemCount: snapshot.data!.docs.length,
                           itemBuilder: (context, index) {
                             Map<String, dynamic> userMap =
                                 snapshot.data!.docs[index].data()
                                     as Map<String, dynamic>;
+
                             return ListTile(
                               leading: CircleAvatar(
-                                  backgroundImage:
-                                      NetworkImage(userMap["profilepic"])),
-                              title:
-                                  Text(userMap["name"] + "(${userMap['age']})"),
-                              subtitle: Text(userMap['email']),
+                                backgroundImage: NetworkImage(userMap[
+                                        "profilepic"] ??
+                                    "http://www.setra.com/hubfs/Sajni/crc_error.jpg"),
+                              ),
+                              title: Text(
+                                  userMap["name"] + " (${userMap["age"]})"),
+                              subtitle: Text(userMap["email"]),
                               trailing: IconButton(
-                                onPressed: () async {
-                                  await FirebaseFirestore.instance
-                                      .collection("users")
-                                      .doc(index.toString())
-                                      .delete();
-                                  log("user Delleted");
+                                onPressed: () {
+                                  // Delete
                                 },
                                 icon: Icon(Icons.delete),
                               ),
                             );
                           },
-                        );
-                      } else {
-                        return Text("No Data !");
-                      }
+                        ),
+                      );
                     } else {
-                      return const Center(child: CircularProgressIndicator());
+                      return Text("No data!");
                     }
-                  },
-                ),
+                  } else {
+                    return Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                },
               ),
             ],
           ),
